@@ -6,11 +6,13 @@ app.secret_key = "dev_secret_key_change_later" #so this is for session managemen
 
 #first trying with a list approach 
 users = {}
-@app.route("/")
+@app.route("/") #this is the main page 
 def home():
    if "users" in session:
    	return redirect(url_for("dashboard")) #used to send user to a specific page, it generates a url for "dashboard" function
    return redirect(url_for("login"))
+   
+   
 @app.route("/register", methods=["GET", "POST"])
 def register():
 	if request.method == "POST":
@@ -21,7 +23,7 @@ def register():
 			return "USER ALREADY EXISTS"
 		
 		users[username] = password
-		return redirect(url_for("login"))
+		return redirect(url_for("dashboard"))
 	return render_template("register.html")
 	
 @app.route("/login", methods=["GET", "POST"])
