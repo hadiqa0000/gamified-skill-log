@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}Create Skill{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 600px; margin: 0 auto;">
+    <div class="card-header">Create New Skill</div>
+    <div class="card-body">
+        <form method="POST">
+            <label>Skill Name</label>
+            <input type="text" name="name" required placeholder="e.g., Python Programming, Web Development">
+            
+            <label>Description</label>
+            <textarea name="description" rows="4" placeholder="Describe what this skill is about..."></textarea>
+            
+            <button type="submit" class="btn btn-primary">Create Skill</button>
+            <a href="{{ url_for('dashboard') }}" class="btn">Cancel</a>
+        </form>
+    </div>
+</div>
+{% endblock %}
