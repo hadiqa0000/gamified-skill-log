@@ -135,9 +135,10 @@ def login():
         cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
         user = cursor.fetchone()
         
-        if user and check_password_hash(user[2], password):
-            session["user_id"] = user[0]
-            session["username"] = user[1]
+        # Fixed: Using column names instead of indexes
+        if user and check_password_hash(user["password"], password):
+            session["user_id"] = user["id"]
+            session["username"] = user["username"]
             flash(f"Welcome back, {username}!", "success")
             return redirect(url_for("dashboard"))
         
@@ -153,9 +154,10 @@ def dashboard():
     conn = get_db()
     cursor = conn.cursor()
     
-    # Get user stats
+    # Get user stats - Fixed: using column name
     cursor.execute("SELECT total_points FROM users WHERE id = ?", (session["user_id"],))
-    user_points = cursor.fetchone()[0]
+    user_points_row = cursor.fetchone()
+    user_points = user_points_row["total_points"] if user_points_row else 0
     
     # Get all active skills
     cursor.execute("""
@@ -244,14 +246,14 @@ def view_skill(skill_id):
     """, (skill_id,))
     tasks = cursor.fetchall()
     
-    # Check which tasks user has completed
+    # Check which tasks user has completed - Fixed: using column name
     completed_tasks = set()
     cursor.execute("""
         SELECT task_id FROM task_completions 
         WHERE user_id = ?
     """, (session["user_id"],))
     for row in cursor.fetchall():
-        completed_tasks.add(row[0])
+        completed_tasks.add(row["task_id"])
     
     # Get leaderboard for this skill
     cursor.execute("""
@@ -284,7 +286,8 @@ def add_task(skill_id):
         flash("Skill not found", "error")
         return redirect(url_for("dashboard"))
     
-    if skill[0] != session["user_id"]:
+    # Fixed: using column name
+    if skill["created_by"] != session["user_id"]:
         flash("You can only add tasks to your own skills", "error")
         return redirect(url_for("view_skill", skill_id=skill_id))
     
@@ -338,11 +341,12 @@ def complete_task(task_id):
     )
     if cursor.fetchone():
         flash("You've already completed this task!", "warning")
-        return redirect(url_for("view_skill", skill_id=task[6]))
+        # Fixed: using column name
+        return redirect(url_for("view_skill", skill_id=task["skill_id"]))
     
-    # Award points
-    points_awarded = task[3]  # points column
-    skill_id = task[6]
+    # Fixed: using column names
+    points_awarded = task["points"]
+    skill_id = task["skill_id"]
     
     # Record completion
     cursor.execute(
@@ -376,7 +380,6 @@ def delete_task(task_id):
     conn = get_db()
     cursor = conn.cursor()
     
-    # Check if user owns the task
     cursor.execute(
         "SELECT skill_id, title FROM tasks WHERE id = ? AND created_by = ?",
         (task_id, session["user_id"])
@@ -394,8 +397,9 @@ def delete_task(task_id):
     )
     conn.commit()
     
-    flash(f"Task '{task[1]}' has been expired", "success")
-    return redirect(url_for("view_skill", skill_id=task[0]))
+    # Fixed: using column name
+    flash(f"Task '{task['title']}' has been expired", "success")
+    return redirect(url_for("view_skill", skill_id=task["skill_id"]))
 
 @app.route("/delete_skill/<int:skill_id>")
 def delete_skill(skill_id):
@@ -405,7 +409,6 @@ def delete_skill(skill_id):
     conn = get_db()
     cursor = conn.cursor()
     
-    # Check if user owns the skill
     cursor.execute(
         "SELECT name FROM skills WHERE id = ? AND created_by = ?",
         (skill_id, session["user_id"])
@@ -421,7 +424,8 @@ def delete_skill(skill_id):
     cursor.execute("UPDATE tasks SET is_active = 0 WHERE skill_id = ?", (skill_id,))
     conn.commit()
     
-    flash(f"Skill '{skill[0]}' has been deleted", "success")
+    # Fixed: using column name
+    flash(f"Skill '{skill['name']}' has been deleted", "success")
     return redirect(url_for("dashboard"))
 
 @app.route("/completed_tasks")
@@ -432,7 +436,6 @@ def completed_tasks():
     conn = get_db()
     cursor = conn.cursor()
     
-    # Get all completed tasks for the user
     cursor.execute("""
         SELECT tc.*, t.title, t.description, t.points, 
                s.name as skill_name, s.id as skill_id,
