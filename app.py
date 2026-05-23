@@ -8,14 +8,16 @@ from services.skills_service import (
     get_skill_leaderboard,
     get_tasks_for_skill,
     user_has_completed_tasks_in_skill,
-    user_owns_skill
+    get_all_skills_leaderboard
 )
-from services.user_service import register_user, login_user, get_user_points, get_global_leaderboard, get_user_completed_tasks
-from services.task_service import  complete_task, add_task, delete_task
-from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime
-import sqlite3
-import os
+from services.user_service import (
+    register_user, 
+    login_user, 
+    get_user_points, 
+    get_global_leaderboard, 
+    get_user_completed_tasks
+)
+from services.task_service import complete_task, add_task, delete_task
 
 app = Flask(__name__)
 app.secret_key = "dev_secret_key_change_later"
@@ -96,29 +98,25 @@ def home():
         return redirect(url_for("dashboard"))
     return redirect(url_for("login"))
 
-
-
-
 @app.route("/register", methods=["GET", "POST"])
 def register():
-if request.method == "POST":
-username = request.form["username"].strip()
-password = request.form["password"].strip()
-
-conn = get_db()
-user_id, status, error = register_user(username, password, conn)
-
-if status == "success":
-conn.commit()
-session["user_id"] = user_id
-session["username"] = username
-flash("Registration successful!", "success")
-return redirect(url_for("dashboard"))
-else:
-flash(error, "error")
-
-return render_template("register.html")
-
+    if request.method == "POST":
+        username = request.form["username"].strip()
+        password = request.form["password"].strip()
+        
+        conn = get_db()
+        user_id, status, error = register_user(username, password, conn)
+        
+        if status == "success":
+            conn.commit()
+            session["user_id"] = user_id
+            session["username"] = username
+            flash("Registration successful!", "success")
+            return redirect(url_for("dashboard"))
+        else:
+            flash(error, "error")
+    
+    return render_template("register.html")
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -126,23 +124,16 @@ def login():
         username = request.form["username"].strip()
         password = request.form["password"].strip()
         
-        if not username or not password:
-            flash("Username and password required", "error")
-            return render_template("login.html")
-        
         conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
-        user = cursor.fetchone()
+        user, status, error = login_user(username, password, conn)
         
-        # Fixed: Using column names instead of indexes
-        if user and check_password_hash(user["password"], password):
+        if status == "success":
             session["user_id"] = user["id"]
             session["username"] = user["username"]
             flash(f"Welcome back, {username}!", "success")
             return redirect(url_for("dashboard"))
-        
-        flash("Invalid credentials", "error")
+        else:
+            flash(error, "error")
     
     return render_template("login.html")
 
@@ -152,45 +143,24 @@ def dashboard():
         return redirect(url_for("login"))
     
     conn = get_db()
-    cursor = conn.cursor()
     
-    # Get user stats - Fixed: using column name
-    cursor.execute("SELECT total_points FROM users WHERE id = ?", (session["user_id"],))
-    user_points_row = cursor.fetchone()
-    user_points = user_points_row["total_points"] if user_points_row else 0
+    # Get user stats
+    user_points = get_user_points(session["user_id"], conn)
     
     # Get all active skills
-    cursor.execute("""
-        SELECT s.*, u.username as creator_name,
-               (SELECT COUNT(*) FROM tasks WHERE skill_id = s.id AND is_active = 1) as task_count
-        FROM skills s
-        JOIN users u ON s.created_by = u.id
-        WHERE s.is_active = 1
-        ORDER BY s.created_at DESC
-    """)
-    skills = cursor.fetchall()
+    skills = get_all_active_skills(conn)
     
-    # Get recent completions
-    cursor.execute("""
-        SELECT tc.*, t.title, u.username, s.name as skill_name, s.id as skill_id
-        FROM task_completions tc
-        JOIN tasks t ON tc.task_id = t.id
-        JOIN users u ON tc.user_id = u.id
-        JOIN skills s ON t.skill_id = s.id
-        ORDER BY tc.completed_at DESC
-        LIMIT 10
-    """)
-    recent_completions = cursor.fetchall()
+    # Get recent completions (limit to 10 most recent)
+    recent_completions = get_user_completed_tasks(session["user_id"], conn)[:10]
     
-    return render_template("dashboard.html", 
+    return render_template("dashboard.html",
                          username=session["username"],
                          user_points=user_points,
                          skills=skills,
                          recent_completions=recent_completions)
 
-
 @app.route("/create_skill", methods=["GET", "POST"])
-def create_skill_route():
+def create_skill():
     if "user_id" not in session:
         return redirect(url_for("login"))
     
@@ -211,7 +181,7 @@ def create_skill_route():
     return render_template("create_skill.html")
 
 @app.route("/skill/<int:skill_id>")
-def view_skill_route(skill_id):
+def view_skill(skill_id):
     if "user_id" not in session:
         return redirect(url_for("login"))
     
@@ -239,147 +209,8 @@ def view_skill_route(skill_id):
                          completed_tasks=completed_tasks,
                          leaderboard=leaderboard)
 
-@app.route("/delete_skill/<int:skill_id>")
-def delete_skill_route(skill_id):
-    if "user_id" not in session:
-        return redirect(url_for("login"))
-    
-    conn = get_db()
-    status, skill_name, error = delete_skill(skill_id, session["user_id"], conn)
-    
-    if status == "success":
-        conn.commit()
-        flash(f"Skill '{skill_name}' has been deleted", "success")
-    else:
-        flash(error, "error")
-    
-    return redirect(url_for("dashboard"))
-
-@app.route("/skill/<int:skill_id>")
-def view_skill(skill_id):
-    if "user_id" not in session:
-        return redirect(url_for("login"))
-    
-    conn = get_db()
-    cursor = conn.cursor()
-    
-    # Get skill details
-    cursor.execute("""
-        SELECT s.*, u.username as creator_name
-        FROM skills s
-        JOIN users u ON s.created_by = u.id
-        WHERE s.id = ? AND s.is_active = 1
-    """, (skill_id,))
-    skill = cursor.fetchone()
-    
-    if not skill:
-        flash("Skill not found", "error")
-        return redirect(url_for("dashboard"))
-    
-    # Get tasks for this skill
-    cursor.execute("""
-        SELECT t.*, u.username as creator_name,
-               (SELECT COUNT(*) FROM task_completions WHERE task_id = t.id) as completion_count
-        FROM tasks t
-        JOIN users u ON t.created_by = u.id
-        WHERE t.skill_id = ? AND t.is_active = 1
-        ORDER BY t.created_at DESC
-    """, (skill_id,))
-    tasks = cursor.fetchall()
-    
-    # Check which tasks user has completed - Fixed: using column name
-    completed_tasks = set()
-    cursor.execute("""
-        SELECT task_id FROM task_completions 
-        WHERE user_id = ?
-    """, (session["user_id"],))
-    for row in cursor.fetchall():
-        completed_tasks.add(row["task_id"])
-    
-    # Get leaderboard for this skill
-    cursor.execute("""
-        SELECT u.username, usp.points
-        FROM user_skill_points usp
-        JOIN users u ON usp.user_id = u.id
-        WHERE usp.skill_id = ?
-        ORDER BY usp.points DESC
-        LIMIT 10
-    """, (skill_id,))
-    leaderboard = cursor.fetchall()
-    
-    return render_template("skill.html", 
-                         skill=skill, 
-                         tasks=tasks, 
-                         completed_tasks=completed_tasks,
-                         leaderboard=leaderboard)
-
 @app.route("/add_task/<int:skill_id>", methods=["GET", "POST"])
 def add_task(skill_id):
-    if "user_id" not in session:
-        return redirect(url_for("login"))
-    
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT created_by FROM skills WHERE id = ?", (skill_id,))
-    skill = cursor.fetchone()
-    
-    if not skill:
-        flash("Skill not found", "error")
-        return redirect(url_for("dashboard"))
-    
-    # Fixed: using column name
-    if skill["created_by"] != session["user_id"]:
-        flash("You can only add tasks to your own skills", "error")
-        return redirect(url_for("view_skill", skill_id=skill_id))
-    
-    if request.method == "POST":
-        title = request.form["title"].strip()
-        description = request.form["description"].strip()
-        points = int(request.form.get("points", 10))
-        
-        if not title:
-            flash("Task title required", "error")
-            return render_template("add_task.html", skill_id=skill_id)
-        
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute(
-            "INSERT INTO tasks (skill_id, title, description, points, created_by) VALUES (?, ?, ?, ?, ?)",
-            (skill_id, title, description, points, session["user_id"])
-        )
-        conn.commit()
-        
-        flash("Task added successfully!", "success")
-        return redirect(url_for("view_skill", skill_id=skill_id))
-    
-    return render_template("add_task.html", skill_id=skill_id)
-
-
-
-
-
-@app.route("/complete_task/<int:task_id>")
-def complete_task_route(task_id):
-    if "user_id" not in session:
-        return redirect(url_for("login"))
-    
-    conn = get_db()
-    points, status, skill_id = complete_task(session["user_id"], task_id, conn)
-    
-    if status == "success":
-        conn.commit()
-        flash(f"Task completed! You earned {points} points!", "success")
-        return redirect(url_for("view_skill", skill_id=skill_id))
-    elif status == "already_completed":
-        flash("You've already completed this task!", "warning")
-        # Need to get skill_id from somewhere else here
-        return redirect(url_for("dashboard"))
-    else:
-        flash("Task not found or inactive", "error")
-        return redirect(url_for("dashboard"))
-
-@app.route("/add_task/<int:skill_id>", methods=["GET", "POST"])
-def add_task_route(skill_id):
     if "user_id" not in session:
         return redirect(url_for("login"))
     
@@ -401,78 +232,64 @@ def add_task_route(skill_id):
             return redirect(url_for("view_skill", skill_id=skill_id))
         else:
             flash(error, "error")
+            return render_template("add_task.html", skill_id=skill_id)
     
     return render_template("add_task.html", skill_id=skill_id)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+@app.route("/complete_task/<int:task_id>")
+def complete_task_route(task_id):
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+    
+    conn = get_db()
+    points, status, skill_id = complete_task(session["user_id"], task_id, conn)
+    
+    if status == "success":
+        conn.commit()
+        flash(f"Task completed! You earned {points} points!", "success")
+        return redirect(url_for("view_skill", skill_id=skill_id))
+    elif status == "already_completed":
+        flash("You've already completed this task!", "warning")
+        # Get skill_id from task to redirect properly
+        from services.task_service import get_task_details
+        task = get_task_details(task_id, conn)
+        if task:
+            return redirect(url_for("view_skill", skill_id=task["skill_id"]))
+        return redirect(url_for("dashboard"))
+    else:
+        flash("Task not found or inactive", "error")
+        return redirect(url_for("dashboard"))
 
 @app.route("/delete_task/<int:task_id>")
-def delete_task(task_id):
+def delete_task_route(task_id):
     if "user_id" not in session:
         return redirect(url_for("login"))
     
     conn = get_db()
-    cursor = conn.cursor()
+    status, skill_id, task_title, error = delete_task(task_id, session["user_id"], conn)
     
-    cursor.execute(
-        "SELECT skill_id, title FROM tasks WHERE id = ? AND created_by = ?",
-        (task_id, session["user_id"])
-    )
-    task = cursor.fetchone()
-    
-    if not task:
-        flash("Task not found or you don't have permission to delete it", "error")
+    if status == "success":
+        conn.commit()
+        flash(f"Task '{task_title}' has been expired", "success")
+        return redirect(url_for("view_skill", skill_id=skill_id))
+    else:
+        flash(error, "error")
         return redirect(url_for("dashboard"))
-    
-    # Soft delete the task
-    cursor.execute(
-        "UPDATE tasks SET is_active = 0 WHERE id = ?",
-        (task_id,)
-    )
-    conn.commit()
-    
-    # Fixed: using column name
-    flash(f"Task '{task['title']}' has been expired", "success")
-    return redirect(url_for("view_skill", skill_id=task["skill_id"]))
 
 @app.route("/delete_skill/<int:skill_id>")
-def delete_skill(skill_id):
+def delete_skill_route(skill_id):
     if "user_id" not in session:
         return redirect(url_for("login"))
     
     conn = get_db()
-    cursor = conn.cursor()
+    status, skill_name, error = delete_skill(skill_id, session["user_id"], conn)
     
-    cursor.execute(
-        "SELECT name FROM skills WHERE id = ? AND created_by = ?",
-        (skill_id, session["user_id"])
-    )
-    skill = cursor.fetchone()
+    if status == "success":
+        conn.commit()
+        flash(f"Skill '{skill_name}' has been deleted", "success")
+    else:
+        flash(error, "error")
     
-    if not skill:
-        flash("Skill not found or you don't have permission to delete it", "error")
-        return redirect(url_for("dashboard"))
-    
-    # Soft delete the skill and its tasks
-    cursor.execute("UPDATE skills SET is_active = 0 WHERE id = ?", (skill_id,))
-    cursor.execute("UPDATE tasks SET is_active = 0 WHERE skill_id = ?", (skill_id,))
-    conn.commit()
-    
-    # Fixed: using column name
-    flash(f"Skill '{skill['name']}' has been deleted", "success")
     return redirect(url_for("dashboard"))
 
 @app.route("/completed_tasks")
@@ -481,19 +298,7 @@ def completed_tasks():
         return redirect(url_for("login"))
     
     conn = get_db()
-    cursor = conn.cursor()
-    
-    cursor.execute("""
-        SELECT tc.*, t.title, t.description, t.points, 
-               s.name as skill_name, s.id as skill_id,
-               CASE WHEN t.is_active = 0 THEN '(Expired)' ELSE '' END as status
-        FROM task_completions tc
-        JOIN tasks t ON tc.task_id = t.id
-        JOIN skills s ON t.skill_id = s.id
-        WHERE tc.user_id = ?
-        ORDER BY tc.completed_at DESC
-    """, (session["user_id"],))
-    completed_tasks = cursor.fetchall()
+    completed_tasks = get_user_completed_tasks(session["user_id"], conn)
     
     return render_template("completed_tasks.html", completed_tasks=completed_tasks)
 
@@ -503,29 +308,14 @@ def leaderboard():
         return redirect(url_for("login"))
     
     conn = get_db()
-    cursor = conn.cursor()
     
     # Global leaderboard
-    cursor.execute("""
-        SELECT username, total_points
-        FROM users
-        ORDER BY total_points DESC
-        LIMIT 20
-    """)
-    global_leaderboard = cursor.fetchall()
+    global_leaderboard = get_global_leaderboard(20, conn)
     
     # Skills leaderboard
-    cursor.execute("""
-        SELECT s.id, s.name, u.username, usp.points
-        FROM user_skill_points usp
-        JOIN skills s ON usp.skill_id = s.id
-        JOIN users u ON usp.user_id = u.id
-        WHERE s.is_active = 1
-        ORDER BY s.name, usp.points DESC
-    """)
-    skill_leaderboards = cursor.fetchall()
+    skill_leaderboards = get_all_skills_leaderboard(conn)
     
-    return render_template("leaderboard.html", 
+    return render_template("leaderboard.html",
                          global_leaderboard=global_leaderboard,
                          skill_leaderboards=skill_leaderboards)
 
