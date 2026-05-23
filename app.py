@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, redirect, session, url_for, flash
 from db import get_db
+from services import complete_task, add_task, delete_task
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 import sqlite3
@@ -313,64 +314,70 @@ def add_task(skill_id):
     
     return render_template("add_task.html", skill_id=skill_id)
 
+
+
+
+
 @app.route("/complete_task/<int:task_id>")
-def complete_task(task_id):
+def complete_task_route(task_id):
     if "user_id" not in session:
         return redirect(url_for("login"))
     
     conn = get_db()
-    cursor = conn.cursor()
+    points, status, skill_id = complete_task(session["user_id"], task_id, conn)
     
-    # Get task details
-    cursor.execute("""
-        SELECT t.*, s.id as skill_id
-        FROM tasks t
-        JOIN skills s ON t.skill_id = s.id
-        WHERE t.id = ? AND t.is_active = 1
-    """, (task_id,))
-    task = cursor.fetchone()
-    
-    if not task:
+    if status == "success":
+        conn.commit()
+        flash(f"Task completed! You earned {points} points!", "success")
+        return redirect(url_for("view_skill", skill_id=skill_id))
+    elif status == "already_completed":
+        flash("You've already completed this task!", "warning")
+        # Need to get skill_id from somewhere else here
+        return redirect(url_for("dashboard"))
+    else:
         flash("Task not found or inactive", "error")
         return redirect(url_for("dashboard"))
+
+@app.route("/add_task/<int:skill_id>", methods=["GET", "POST"])
+def add_task_route(skill_id):
+    if "user_id" not in session:
+        return redirect(url_for("login"))
     
-    # Check if already completed
-    cursor.execute(
-        "SELECT * FROM task_completions WHERE task_id = ? AND user_id = ?",
-        (task_id, session["user_id"])
-    )
-    if cursor.fetchone():
-        flash("You've already completed this task!", "warning")
-        # Fixed: using column name
-        return redirect(url_for("view_skill", skill_id=task["skill_id"]))
+    if request.method == "POST":
+        title = request.form["title"].strip()
+        description = request.form["description"].strip()
+        points = int(request.form.get("points", 10))
+        
+        if not title:
+            flash("Task title required", "error")
+            return render_template("add_task.html", skill_id=skill_id)
+        
+        conn = get_db()
+        task_id, status, error = add_task(skill_id, title, description, points, session["user_id"], conn)
+        
+        if status == "success":
+            conn.commit()
+            flash("Task added successfully!", "success")
+            return redirect(url_for("view_skill", skill_id=skill_id))
+        else:
+            flash(error, "error")
     
-    # Fixed: using column names
-    points_awarded = task["points"]
-    skill_id = task["skill_id"]
-    
-    # Record completion
-    cursor.execute(
-        "INSERT INTO task_completions (task_id, user_id, points_awarded) VALUES (?, ?, ?)",
-        (task_id, session["user_id"], points_awarded)
-    )
-    
-    # Update user total points
-    cursor.execute(
-        "UPDATE users SET total_points = total_points + ? WHERE id = ?",
-        (points_awarded, session["user_id"])
-    )
-    
-    # Update user skill points
-    cursor.execute(
-        "INSERT INTO user_skill_points (user_id, skill_id, points) VALUES (?, ?, ?) \
-         ON CONFLICT(user_id, skill_id) DO UPDATE SET points = points + ?",
-        (session["user_id"], skill_id, points_awarded, points_awarded)
-    )
-    
-    conn.commit()
-    
-    flash(f"Task completed! You earned {points_awarded} points!", "success")
-    return redirect(url_for("view_skill", skill_id=skill_id))
+    return render_template("add_task.html", skill_id=skill_id)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 @app.route("/delete_task/<int:task_id>")
 def delete_task(task_id):
