@@ -283,6 +283,57 @@ def view_skill(skill_id):
 
 
 
+@app.route("/add_task/<int:skill_id>", methods=["GET", "POST"])
+def add_task(skill_id):
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+    
+    with sqlite3.connect("users.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT created_by FROM skills WHERE id = ?", (skill_id,))
+        skill = cursor.fetchone()
+        
+        
+        
+        if not skill:
+            flash("Skill not found", "error")
+            return redirect(url_for("dashboard"))
+        
+        if skill[0] != session["user_id"]:
+            flash("You can only add tasks to your own skills", "error")
+            return redirect(url_for("view_skill", skill_id=skill_id))
+    
+    if request.method == "POST":
+        title = request.form["title"].strip()
+        description = request.form["description"].strip()
+        points = int(request.form.get("points", 10))
+        
+        
+       if not title:
+            flash("Task title required", "error")
+            return render_template("add_task.html", skill_id=skill_id)
+        
+       with sqlite3.connect("users.db") as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO tasks (skill_id, title, description, points, created_by) VALUES (?, ?, ?, ?, ?)",
+                (skill_id, title, description, points, session["user_id"])
+                
+                )
+                
+                conn.commit()
+                
+            flash("task added succesfully!", "success")
+            return redirect(url_for("view_skill", skill_id=skill_id))
+            
+         return render_template("add_task.html", skill_id=skill_id)
+         
+         
+
+
+
+
+
 
 
 
