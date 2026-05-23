@@ -1,5 +1,15 @@
 from flask import Flask, render_template, request, redirect, session, url_for, flash
 from db import get_db
+from services.skills_service import (
+    create_skill, 
+    get_skill_by_id, 
+    get_all_active_skills,
+    delete_skill,
+    get_skill_leaderboard,
+    get_tasks_for_skill,
+    user_has_completed_tasks_in_skill,
+    user_owns_skill
+)
 from services import complete_task, add_task, delete_task
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
@@ -189,8 +199,9 @@ def dashboard():
                          skills=skills,
                          recent_completions=recent_completions)
 
+
 @app.route("/create_skill", methods=["GET", "POST"])
-def create_skill():
+def create_skill_route():
     if "user_id" not in session:
         return redirect(url_for("login"))
     
@@ -198,22 +209,62 @@ def create_skill():
         name = request.form["name"].strip()
         description = request.form["description"].strip()
         
-        if not name:
-            flash("Skill name required", "error")
-            return render_template("create_skill.html")
-        
         conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute(
-            "INSERT INTO skills (name, description, created_by) VALUES (?, ?, ?)",
-            (name, description, session["user_id"])
-        )
-        conn.commit()
+        skill_id, status, error = create_skill(name, description, session["user_id"], conn)
         
-        flash(f"Skill '{name}' created successfully!", "success")
-        return redirect(url_for("dashboard"))
+        if status == "success":
+            conn.commit()
+            flash(f"Skill '{name}' created successfully!", "success")
+            return redirect(url_for("dashboard"))
+        else:
+            flash(error, "error")
     
     return render_template("create_skill.html")
+
+@app.route("/skill/<int:skill_id>")
+def view_skill_route(skill_id):
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+    
+    conn = get_db()
+    
+    # Get skill details
+    skill = get_skill_by_id(skill_id, conn)
+    
+    if not skill:
+        flash("Skill not found", "error")
+        return redirect(url_for("dashboard"))
+    
+    # Get tasks for this skill
+    tasks = get_tasks_for_skill(skill_id, conn)
+    
+    # Check which tasks user has completed
+    completed_tasks = user_has_completed_tasks_in_skill(session["user_id"], skill_id, conn)
+    
+    # Get leaderboard for this skill
+    leaderboard = get_skill_leaderboard(skill_id, 10, conn)
+    
+    return render_template("skill.html", 
+                         skill=skill, 
+                         tasks=tasks, 
+                         completed_tasks=completed_tasks,
+                         leaderboard=leaderboard)
+
+@app.route("/delete_skill/<int:skill_id>")
+def delete_skill_route(skill_id):
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+    
+    conn = get_db()
+    status, skill_name, error = delete_skill(skill_id, session["user_id"], conn)
+    
+    if status == "success":
+        conn.commit()
+        flash(f"Skill '{skill_name}' has been deleted", "success")
+    else:
+        flash(error, "error")
+    
+    return redirect(url_for("dashboard"))
 
 @app.route("/skill/<int:skill_id>")
 def view_skill(skill_id):
