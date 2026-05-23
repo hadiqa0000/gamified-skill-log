@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}Add Task{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 600px; margin: 0 auto;">
+    <div class="card-header">Add New Task</div>
+    <div class="card-body">
+        <form method="POST">
+            <label>Task Title</label>
+            <input type="text" name="title" required placeholder="e.g., Complete Python Exercise 1">
+            
+            <label>Description</label>
+            <textarea name="description" rows="4" placeholder="Describe what needs to be done..."></textarea>
+            
+            <label>Points</label>
+            <input type="number" name="points" value="10" min="1" max="1000">
+            
+            <button type="submit" class="btn btn-primary">Add Task</button>
+            <a href="{{ url_for('view_skill', skill_id=skill_id) }}" class="btn">Cancel</a>
+        </form>
+    </div>
+</div>
+{% endblock %}
