@@ -226,3 +226,96 @@ def user_exists(username, conn):
     cursor.execute("SELECT id FROM users WHERE username = ?", (username.strip(),))
     
     return cursor.fetchone() is not None
+    
+    
+    
+    
+    
+    
+    
+    
+    
+# services/user_service.py
+
+def get_user_skill_points(user_id, conn):
+    """
+    Calculate user's points per skill from task completions
+    
+    Args:
+        user_id: The user ID
+        conn: Database connection object
+    
+    Returns:
+        list: List of skills with points earned
+    """
+    cursor = conn.cursor()
+    
+    cursor.execute("""
+        SELECT 
+            s.id as skill_id,
+            s.name as skill_name,
+            COALESCE(SUM(tc.points_awarded), 0) as points
+        FROM skills s
+        LEFT JOIN tasks t ON s.id = t.skill_id AND t.is_active = 1
+        LEFT JOIN task_completions tc ON t.id = tc.task_id AND tc.user_id = ?
+        WHERE s.is_active = 1
+        GROUP BY s.id, s.name
+        ORDER BY points DESC
+    """, (user_id,))
+    
+    return cursor.fetchall()
+
+
+def get_user_points_for_skill(user_id, skill_id, conn):
+    """
+    Calculate user's points for a specific skill
+    
+    Args:
+        user_id: The user ID
+        skill_id: The skill ID
+        conn: Database connection object
+    
+    Returns:
+        int: Total points earned for that skill
+    """
+    cursor = conn.cursor()
+    
+    cursor.execute("""
+        SELECT COALESCE(SUM(tc.points_awarded), 0) as points
+        FROM task_completions tc
+        JOIN tasks t ON tc.task_id = t.id
+        WHERE tc.user_id = ? AND t.skill_id = ?
+    """, (user_id, skill_id))
+    
+    result = cursor.fetchone()
+    return result["points"] if result else 0
+
+
+def get_skill_leaderboard(skill_id, conn, limit=10):
+    """
+    Get leaderboard for a specific skill by calculating from completions
+    
+    Args:
+        skill_id: The skill ID
+        conn: Database connection object
+        limit: Number of top users to return
+    
+    Returns:
+        list: Users with their points for this skill
+    """
+    cursor = conn.cursor()
+    
+    cursor.execute("""
+        SELECT 
+            u.username,
+            COALESCE(SUM(tc.points_awarded), 0) as points
+        FROM users u
+        LEFT JOIN task_completions tc ON u.id = tc.user_id
+        LEFT JOIN tasks t ON tc.task_id = t.id AND t.skill_id = ?
+        GROUP BY u.id, u.username
+        HAVING points > 0
+        ORDER BY points DESC
+        LIMIT ?
+    """, (skill_id, limit))
+    
+    return cursor.fetchall()
