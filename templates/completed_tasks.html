@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}Completed Tasks{% endblock %}
+
+{% block content %}
+<h1>My Completed Tasks</h1>
+
+<div class="card">
+    <div class="card-body">
+        {% for task in completed_tasks %}
+        <div style="padding: 1rem; border-bottom: 1px solid #eee;">
+            <strong>{{ task[7] }}</strong> 
+            {% if task[11] %}<span style="color: #dc3545;">{{ task[11] }}</span>{% endif %}
+            <div style="margin-top: 0.5rem;">
+                <span class="skill-meta">Skill: <a href="{{ url_for('view_skill', skill_id=task[9]) }}">{{ task[8] }}</a></span>
+                <span class="points">+{{ task[4] }} points</span>
+                <span style="color: #666; font-size: 0.9rem; float: right;">Completed: {{ task[3] }}</span>
+            </div>
+            {% if task[5] %}
+            <p style="margin-top: 0.5rem; color: #666;">{{ task[5] }}</p>
+            {% endif %}
+        </div>
+        {% else %}
+        <p>You haven't completed any tasks yet. Start learning!</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
