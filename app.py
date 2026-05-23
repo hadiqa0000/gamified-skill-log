@@ -170,6 +170,16 @@ def dashboard():
         """)
         skills = cursor.fetchall()
         
+        
+        
+        
+        
+        
+        
+        
+        
+    
+        
 
 @app.route("/logout")
 def logout():
