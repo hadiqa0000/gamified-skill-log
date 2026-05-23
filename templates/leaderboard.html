@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}Leaderboard{% endblock %}
+
+{% block content %}
+<h1>Global Leaderboard</h1>
+<div class="card">
+    <div class="card-body">
+        {% for user in global_leaderboard %}
+        <div style="padding: 0.75rem; border-bottom: 1px solid #eee;">
+            <strong>{{ loop.index }}.</strong> {{ user[0] }} - <span class="points">{{ user[1] }} total points</span>
+        </div>
+        {% else %}
+        <p>No users yet.</p>
+        {% endfor %}
+    </div>
+</div>
+
+<h2 style="margin-top: 2rem;">Skill Leaderboards</h2>
+{% set current_skill = namespace(name='') %}
+{% for entry in skill_leaderboards %}
+    {% if current_skill.name != entry[1] %}
+        {% if not loop.first %}</div></div>{% endif %}
+        <div class="card" style="margin-top: 1rem;">
+            <div class="card-header">{{ entry[1] }}</div>
+            <div class="card-body">
+        {% set current_skill.name = entry[1] %}
+    {% endif %}
+    <div style="padding: 0.5rem; border-bottom: 1px solid #eee;">
+        {{ loop.index if current_skill.name != skill_leaderboards[loop.index0-1][1] else '' }}. 
+        <strong>{{ entry[2] }}</strong> - <span class="points">{{ entry[3] }} points</span>
+    </div>
+    {% if loop.last %}</div></div>{% endif %}
+{% else %}
+<p>No skill leaderboards available yet.</p>
+{% endfor %}
+{% endblock %}
