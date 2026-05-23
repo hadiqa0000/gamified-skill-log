@@ -10,7 +10,8 @@ from services.skills_service import (
     user_has_completed_tasks_in_skill,
     user_owns_skill
 )
-from services import complete_task, add_task, delete_task
+from services.user_service import register_user, login_user, get_user_points, get_global_leaderboard, get_user_completed_tasks
+from services.task_service import  complete_task, add_task, delete_task
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 import sqlite3
@@ -95,41 +96,29 @@ def home():
         return redirect(url_for("dashboard"))
     return redirect(url_for("login"))
 
+
+
+
 @app.route("/register", methods=["GET", "POST"])
 def register():
-    if request.method == "POST":
-        username = request.form["username"].strip()
-        password = request.form["password"].strip()
-        
-        if not username or not password:
-            flash("Username and password required", "error")
-            return render_template("register.html")
-        
-        conn = get_db()
-        cursor = conn.cursor()
-        
-        cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
-        existing_user = cursor.fetchone()
-        
-        if existing_user:
-            flash("Username already exists", "error")
-            return render_template("register.html")
-        
-        hashed_password = generate_password_hash(password)
-        cursor.execute(
-            "INSERT INTO users (username, password) VALUES (?, ?)",
-            (username, hashed_password)
-        )
-        conn.commit()
-        
-        user_id = cursor.lastrowid
-        session["user_id"] = user_id
-        session["username"] = username
-        
-        flash("Registration successful!", "success")
-        return redirect(url_for("dashboard"))
-    
-    return render_template("register.html")
+if request.method == "POST":
+username = request.form["username"].strip()
+password = request.form["password"].strip()
+
+conn = get_db()
+user_id, status, error = register_user(username, password, conn)
+
+if status == "success":
+conn.commit()
+session["user_id"] = user_id
+session["username"] = username
+flash("Registration successful!", "success")
+return redirect(url_for("dashboard"))
+else:
+flash(error, "error")
+
+return render_template("register.html")
+
 
 @app.route("/login", methods=["GET", "POST"])
 def login():

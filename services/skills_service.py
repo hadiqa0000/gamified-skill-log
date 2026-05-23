@@ -208,3 +208,30 @@ def user_owns_skill(skill_id, user_id, conn):
     )
     
     return cursor.fetchone() is not None
+    
+    
+    
+    
+# Add this to your skills_service.py
+def get_all_skills_leaderboard(conn):
+    """
+    Get leaderboard for all active skills
+    
+    Args:
+        conn: Database connection object
+    
+    Returns:
+        list: List of all skill points across users
+    """
+    cursor = conn.cursor()
+    
+    cursor.execute("""
+        SELECT s.id, s.name, u.username, usp.points
+        FROM user_skill_points usp
+        JOIN skills s ON usp.skill_id = s.id
+        JOIN users u ON usp.user_id = u.id
+        WHERE s.is_active = 1
+        ORDER BY s.name, usp.points DESC
+    """)
+    
+    return cursor.fetchall()
