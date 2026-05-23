@@ -235,3 +235,5 @@ def get_all_skills_leaderboard(conn):
     """)
     
     return cursor.fetchall()
+    
+    

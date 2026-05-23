@@ -5,19 +5,19 @@ from services.skills_service import (
     get_skill_by_id, 
     get_all_active_skills,
     delete_skill,
-    get_skill_leaderboard,
     get_tasks_for_skill,
-    user_has_completed_tasks_in_skill,
-    get_all_skills_leaderboard
+    user_has_completed_tasks_in_skill
 )
 from services.user_service import (
     register_user, 
     login_user, 
     get_user_points, 
     get_global_leaderboard, 
-    get_user_completed_tasks
+    get_user_completed_tasks,
+    get_skill_leaderboard,
+    get_all_skills_leaderboard
 )
-from services.task_service import complete_task, add_task, delete_task
+from services.task_service import complete_task, add_task, delete_task, get_task_details
 
 app = Flask(__name__)
 app.secret_key = "dev_secret_key_change_later"
@@ -73,18 +73,6 @@ def init_db():
         FOREIGN KEY (task_id) REFERENCES tasks (id),
         FOREIGN KEY (user_id) REFERENCES users (id),
         UNIQUE(task_id, user_id)
-    )
-    """)
-    
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS user_skill_points (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER,
-        skill_id INTEGER,
-        points INTEGER DEFAULT 0,
-        FOREIGN KEY (user_id) REFERENCES users (id),
-        FOREIGN KEY (skill_id) REFERENCES skills (id),
-        UNIQUE(user_id, skill_id)
     )
     """)
     
@@ -144,13 +132,8 @@ def dashboard():
     
     conn = get_db()
     
-    # Get user stats
     user_points = get_user_points(session["user_id"], conn)
-    
-    # Get all active skills
     skills = get_all_active_skills(conn)
-    
-    # Get recent completions (limit to 10 most recent)
     recent_completions = get_user_completed_tasks(session["user_id"], conn)[:10]
     
     return render_template("dashboard.html",
@@ -187,21 +170,15 @@ def view_skill(skill_id):
     
     conn = get_db()
     
-    # Get skill details
     skill = get_skill_by_id(skill_id, conn)
     
     if not skill:
         flash("Skill not found", "error")
         return redirect(url_for("dashboard"))
     
-    # Get tasks for this skill
     tasks = get_tasks_for_skill(skill_id, conn)
-    
-    # Check which tasks user has completed
     completed_tasks = user_has_completed_tasks_in_skill(session["user_id"], skill_id, conn)
-    
-    # Get leaderboard for this skill
-    leaderboard = get_skill_leaderboard(skill_id, 10, conn)
+    leaderboard = get_skill_leaderboard(skill_id, conn, 10)
     
     return render_template("skill.html", 
                          skill=skill, 
@@ -209,6 +186,7 @@ def view_skill(skill_id):
                          completed_tasks=completed_tasks,
                          leaderboard=leaderboard)
 
+# THIS IS THE CORRECT ADD_TASK ROUTE - KEEP ONLY THIS ONE
 @app.route("/add_task/<int:skill_id>", methods=["GET", "POST"])
 def add_task(skill_id):
     if "user_id" not in session:
@@ -250,8 +228,6 @@ def complete_task_route(task_id):
         return redirect(url_for("view_skill", skill_id=skill_id))
     elif status == "already_completed":
         flash("You've already completed this task!", "warning")
-        # Get skill_id from task to redirect properly
-        from services.task_service import get_task_details
         task = get_task_details(task_id, conn)
         if task:
             return redirect(url_for("view_skill", skill_id=task["skill_id"]))
@@ -308,11 +284,7 @@ def leaderboard():
         return redirect(url_for("login"))
     
     conn = get_db()
-    
-    # Global leaderboard
     global_leaderboard = get_global_leaderboard(20, conn)
-    
-    # Skills leaderboard
     skill_leaderboards = get_all_skills_leaderboard(conn)
     
     return render_template("leaderboard.html",
