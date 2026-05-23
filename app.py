@@ -172,14 +172,119 @@ def dashboard():
         
         
         
+
+       
+        cursor.execute("""
+            SELECT tc.*, t.title, u.username, s.name as skill_name, s.id as skill_id
+            FROM task_completions tc
+            JOIN tasks t ON tc.task_id = t.id
+            JOIN users u ON tc.user_id = u.id
+            JOIN skills s ON t.skill_id = s.id
+            ORDER BY tc.completed_at DESC
+            LIMIT 10
+        """)
+        recent_completions = cursor.fetchall()
         
-        
-        
-        
-        
-        
+    return render_template("dashboard.html", 
+                         username=session["username"],
+                         user_points=user_points,
+                         skills=skills,
+                         recent_completions=recent_completions)
+
+@app.route("/create_skill", methods=["GET", "POST"])
+def create_skill():
+    if "user_id" not in session:
+        return redirect(url_for("login"))
     
+    if request.method == "POST":
+        name = request.form["name"].strip()
+        description = request.form["description"].strip()
         
+        if not name:
+            flash("Skill name required", "error")
+            return render_template("create_skill.html")
+        
+        with sqlite3.connect("users.db") as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO skills (name, description, created_by) VALUES (?, ?, ?)",
+                (name, description, session["user_id"])
+            )
+            conn.commit()
+        
+        flash(f"Skill '{name}' created successfully!", "success")
+        return redirect(url_for("dashboard"))
+    
+    return render_template("create_skill.html")
+    
+    
+    
+    
+    
+    @app.route("/skill/<int:skill_id>")
+def view_skill(skill_id):
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+    
+    with sqlite3.connect("users.db") as conn:
+        cursor = conn.cursor()
+        
+      
+        cursor.execute("""
+            SELECT s.*, u.username as creator_name
+            FROM skills s
+            JOIN users u ON s.created_by = u.id
+            WHERE s.id = ? AND s.is_active = 1
+        """, (skill_id,))
+        skill = cursor.fetchone()
+        
+        if not skill:
+            flash("Skill not found", "error")
+            return redirect(url_for("dashboard"))
+        
+        
+        cursor.execute("""
+            SELECT t.*, u.username as creator_name,
+                   (SELECT COUNT(*) FROM task_completions WHERE task_id = t.id) as completion_count
+            FROM tasks t
+            JOIN users u ON t.created_by = u.id
+            WHERE t.skill_id = ? AND t.is_active = 1
+            ORDER BY t.created_at DESC
+        """, (skill_id,))
+        tasks = cursor.fetchall()
+        
+       
+        completed_tasks = set()
+        cursor.execute("""
+            SELECT task_id FROM task_completions 
+            WHERE user_id = ?
+        """, (session["user_id"],))
+        for row in cursor.fetchall():
+            completed_tasks.add(row[0])
+        
+        
+        cursor.execute("""
+            SELECT u.username, usp.points
+            FROM user_skill_points usp
+            JOIN users u ON usp.user_id = u.id
+            WHERE usp.skill_id = ?
+            ORDER BY usp.points DESC
+            LIMIT 10
+        """, (skill_id,))
+        leaderboard = cursor.fetchall()
+        
+    return render_template("skill.html", 
+                         skill=skill, 
+                         tasks=tasks, 
+                         completed_tasks=completed_tasks,
+                         leaderboard=leaderboard)
+
+
+
+
+
+
+
 
 @app.route("/logout")
 def logout():
