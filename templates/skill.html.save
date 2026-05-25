@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}{{ skill[1] }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        {{ skill[1] }}
+        {% if skill[4] == session.user_id %}
+        <a href="{{ url_for('delete_skill', skill_id=skill[0]) }}" class="btn btn-danger" style="float: right; margin-left: 10px;" onclick="return confirm('Delete this skill and all its tasks?')">Delete Skill</a>
+        <a href="{{ url_for('add_task', skill_id=skill[0]) }}" class="btn btn-primary" style="float: right;">+ Add New Task</a>
+        {% endif %}
+
+        <!-- Incorporated: Alternative add task button using skill[3] == session["user_id"] -->
+        {% if skill[3] == session["user_id"] %}
+        <a href="{{ url_for('add_task', skill_id=skill[0]) }}" style="float: right; margin-right: 10px;">
+            <button>Add Task</button>
+        </a>
+        {% endif %}
+    </div>
+    <div class="card-body">
+        <p>{{ skill[2] }}</p>
+        <div class="skill-meta">Created by: {{ skill[5] }} | Created: {{ skill[3] }}</div>
+    </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 2fr 1fr; gap: 2rem;">
+    <div>
+        <h2>Available Tasks</h2>
+        {% if skill[4] == session.user_id %}
+        <div style="margin-bottom: 1rem;">
+            <a href="{{ url_for('add_task', skill_id=skill[0]) }}" class="btn btn-primary">+ Add New Task to this Skill</a>
+        </div>
+        {% endif %}
+        
+        {% for task in tasks %}
+        <div class="task-item">
+            <div class="task-title">{{ task[2] }}</div>
+            <div class="task-meta">Created by: {{ task[6] }} | Points: <span class="points">{{ task[4] }}</span> | Times Completed: {{ task[7] }}</div>
+            <p>{{ task[3] }}</p>
+            
+            {% if task[0] not in completed_tasks %}
+                <a href="{{ url_for('complete_task', task_id=task[0]) }}" class="btn btn-success">✓ Complete Task & Earn {{ task[4] }} Points</a>
+            {% else %}
+                <span class="btn" style="background: #6c757d; color: white; cursor: default;">✓ Already Completed</span>
+            {% endif %}
+            
+            {% if task[5] == session.user_id %}
+                <a href="{{ url_for('delete_task', task_id=task[0]) }}" class="btn btn-danger" style="margin-left: 10px;" onclick="return confirm('Expire this task? It will show as expired in completed tasks.')">🗑️ Expire Task</a>
+            {% endif %}
+        </div>
+        {% else %}
+        <div class="card">
+            <div class="card-body">
+                <p>No tasks in this skill yet.</p>
+                {% if skill[4] == session.user_id %}
+                <a href="{{ url_for('add_task', skill_id=skill[0]) }}" class="btn btn-primary">Create the first task!</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    
+    <div>
+        <h2>🏆 Skill Leaderboard</h2>
+        <div class="card">
+            <div class="card-body">
+                {% if leaderboard %}
+                    {% for entry in leaderboard %}
+                    <div style="padding: 0.5rem; border-bottom: 1px solid #eee;">
+                        <strong>{{ loop.index }}.</strong> {{ entry[0] }} - <span class="points">{{ entry[1] }} points</span>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p>No one has earned points in this skill yet. Be the first!</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

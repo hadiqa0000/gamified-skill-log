@@ -1,39 +1,30 @@
-{% extends "base.html" %}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Add Task</title>
+</head>
+<body>
 
-{% block title %}Add Task to {{ skill_name }}{% endblock %}
+<h1>Add Task to {{ skill_name }}</h1>
 
-{% block content %}
-<div class="card" style="max-width: 600px; margin: 0 auto;">
-    <div class="card-header">
-        Add New Task to "{{ skill_name }}"
-    </div>
-    <div class="card-body">
-        <form method="POST">
-            <label>Task Title *</label>
-            <input type="text" name="title" required placeholder="e.g., Complete Python Exercise 1">
-            
-            <label>Description</label>
-            <textarea name="description" rows="4" placeholder="Describe what needs to be done..."></textarea>
-            
-            <label>Points Reward (1-1000)</label>
-            <input type="number" name="points" value="10" min="1" max="1000">
-            <small style="color: #666; display: block; margin-bottom: 1rem;">Users will earn this many points for completing the task</small>
-            
-            <button type="submit" class="btn btn-primary">➕ Add Task</button>
-            <a href="{{ url_for('view_skill', skill_id=skill_id) }}" class="btn">Cancel</a>
-        </form>
-    </div>
-</div>
+<form method="POST">
 
-<div class="card" style="max-width: 600px; margin: 1rem auto;">
-    <div class="card-header">💡 Tips for creating good tasks</div>
-    <div class="card-body">
-        <ul>
-            <li>Make tasks specific and achievable</li>
-            <li>Set appropriate points based on difficulty (easy: 5-10, medium: 15-25, hard: 30-50)</li>
-            <li>Provide clear instructions in the description</li>
-            <li>Update tasks regularly to keep learners engaged</li>
-        </ul>
-    </div>
-</div>
-{% endblock %}
+    <label>Task Title</label><br>
+    <input type="text" name="title" required><br><br>
+
+    <label>Description</label><br>
+    <textarea name="description"></textarea><br><br>
+
+    <label>Points</label><br>
+    <input type="number" name="points" value="10" min="1" max="1000"><br><br>
+
+    <button type="submit">Create Task</button>
+
+</form>
+
+<a href="{{ url_for('view_skill', skill_id=skill_id) }}">
+    Back
+</a>
+
+</body>
+</html>
