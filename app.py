@@ -340,58 +340,59 @@ def add_task(skill_id):
 def complete_task(task_id):
     if "user_id" not in session:
         return redirect(url_for("login"))
-    
+
     with sqlite3.connect("users.db") as conn:
         cursor = conn.cursor()
-        
-        # Get task details
+
         cursor.execute("""
-            SELECT t.*, s.id as skill_id
+            SELECT t.id, t.skill_id, t.title, t.description,
+                   t.points, t.created_by, t.created_at, t.is_active,
+                   s.id as skill_id
             FROM tasks t
             JOIN skills s ON t.skill_id = s.id
             WHERE t.id = ? AND t.is_active = 1
         """, (task_id,))
+
         task = cursor.fetchone()
-        
+
         if not task:
             flash("Task not found or inactive", "error")
             return redirect(url_for("dashboard"))
-        
-        # Check if already completed
-        cursor.execute(
-            "SELECT * FROM task_completions WHERE task_id = ? AND user_id = ?",
-            (task_id, session["user_id"])
-        )
+
+        task_id_db = task[0]
+        skill_id = task[1]
+        points_awarded = task[4]   # FIXED
+
+        cursor.execute("""
+            SELECT 1 FROM task_completions
+            WHERE task_id = ? AND user_id = ?
+        """, (task_id, session["user_id"]))
+
         if cursor.fetchone():
-            flash("You've already completed this task!", "warning")
-            return redirect(url_for("view_skill", skill_id=task[6]))
-        
-        # Award points
-        points_awarded = task[3]  # points column
-        skill_id = task[6]
-        
-        # Record completion
-        cursor.execute(
-            "INSERT INTO task_completions (task_id, user_id, points_awarded) VALUES (?, ?, ?)",
-            (task_id, session["user_id"], points_awarded)
-        )
-        
-        # Update user total points
-        cursor.execute(
-            "UPDATE users SET total_points = total_points + ? WHERE id = ?",
-            (points_awarded, session["user_id"])
-        )
-        
-        # Update user skill points
-        cursor.execute(
-            "INSERT INTO user_skill_points (user_id, skill_id, points) VALUES (?, ?, ?) \
-             ON CONFLICT(user_id, skill_id) DO UPDATE SET points = points + ?",
-            (session["user_id"], skill_id, points_awarded, points_awarded)
-        )
-        
+            flash("Already completed", "warning")
+            return redirect(url_for("view_skill", skill_id=skill_id))
+
+        cursor.execute("""
+            INSERT INTO task_completions (task_id, user_id, points_awarded)
+            VALUES (?, ?, ?)
+        """, (task_id, session["user_id"], points_awarded))
+
+        cursor.execute("""
+            UPDATE users
+            SET total_points = total_points + ?
+            WHERE id = ?
+        """, (points_awarded, session["user_id"]))
+
+        cursor.execute("""
+            INSERT INTO user_skill_points (user_id, skill_id, points)
+            VALUES (?, ?, ?)
+            ON CONFLICT(user_id, skill_id)
+            DO UPDATE SET points = points + ?
+        """, (session["user_id"], skill_id, points_awarded, points_awarded))
+
         conn.commit()
-    
-    flash(f"Task completed! You earned {points_awarded} points!", "success")
+
+    flash(f"Task completed! +{points_awarded} points", "success")
     return redirect(url_for("view_skill", skill_id=skill_id))
 
 @app.route("/delete_task/<int:task_id>")
