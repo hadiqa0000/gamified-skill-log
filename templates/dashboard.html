@@ -3,32 +3,41 @@
 {% block title %}Dashboard{% endblock %}
 
 {% block content %}
-<h1>Welcome, {{ username }}!</h1>
-<p style="margin-bottom: 2rem;">Total Points: <strong class="points">{{ user_points }}</strong></p>
+<h1>Welcome, {{ username }}! 👋</h1>
+<p style="margin-bottom: 2rem;">Total Points: <strong class="points">⭐ {{ user_points }}</strong></p>
 
-<h2>Available Skills</h2>
+<h2>📚 Available Skills</h2>
 <div class="grid">
     {% for skill in skills %}
     <div class="skill-card">
         <div class="skill-title">{{ skill[1] }}</div>
         <div class="skill-meta">Created by: {{ skill[6] }} | Tasks: {{ skill[7] }}</div>
         <p>{{ skill[2][:100] }}{% if skill[2]|length > 100 %}...{% endif %}</p>
-        <a href="{{ url_for('view_skill', skill_id=skill[0]) }}" class="btn btn-primary">View Skill</a>
+        <div style="display: flex; gap: 10px; margin-top: 10px;">
+            <a href="{{ url_for('view_skill', skill_id=skill[0]) }}" class="btn btn-primary">View Skill</a>
+            {% if skill[4] == session.user_id %}
+            <a href="{{ url_for('add_task', skill_id=skill[0]) }}" class="btn btn-success">+ Add Task</a>
+            {% endif %}
+        </div>
     </div>
     {% else %}
     <p>No skills available yet. <a href="{{ url_for('create_skill') }}">Create the first skill!</a></p>
     {% endfor %}
 </div>
 
+<div style="margin-top: 2rem; text-align: center;">
+    <a href="{{ url_for('create_skill') }}" class="btn btn-primary">🏗️ Create New Skill</a>
+</div>
+
 {% if recent_completions %}
-<h2 style="margin-top: 2rem;">Recent Activity</h2>
+<h2 style="margin-top: 2rem;">🔄 Recent Activity</h2>
 <div class="card">
     <div class="card-body">
         {% for completion in recent_completions %}
         <div style="padding: 0.5rem; border-bottom: 1px solid #eee;">
             <strong>{{ completion[7] }}</strong> completed "{{ completion[5] }}" in 
             <a href="{{ url_for('view_skill', skill_id=completion[8]) }}">{{ completion[6] }}</a> 
-            and earned <span class="points">{{ completion[4] }} points</span>
+            and earned <span class="points">+{{ completion[4] }} points</span>
             <span style="color: #666; font-size: 0.9rem;">({{ completion[3] }})</span>
         </div>
         {% endfor %}

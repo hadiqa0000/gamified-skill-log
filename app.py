@@ -190,29 +190,53 @@ def view_skill(skill_id):
 @app.route("/add_task/<int:skill_id>", methods=["GET", "POST"])
 def add_task(skill_id):
     if "user_id" not in session:
+        flash("Please login to add tasks", "error")
         return redirect(url_for("login"))
     
+    # Verify skill exists and user owns it
+    with sqlite3.connect("users.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT name, created_by, is_active FROM skills WHERE id = ?", (skill_id,))
+        skill = cursor.fetchone()
+        
+        if not skill:
+            flash("Skill not found", "error")
+            return redirect(url_for("dashboard"))
+        
+        if skill[2] == 0:
+            flash("This skill has been deleted", "error")
+            return redirect(url_for("dashboard"))
+        
+        if skill[1] != session["user_id"]:
+            flash("You can only add tasks to your own skills", "error")
+            return redirect(url_for("view_skill", skill_id=skill_id))
+    
     if request.method == "POST":
-        title = request.form["title"].strip()
-        description = request.form["description"].strip()
+        title = request.form.get("title", "").strip()
+        description = request.form.get("description", "").strip()
         points = int(request.form.get("points", 10))
         
         if not title:
-            flash("Task title required", "error")
-            return render_template("add_task.html", skill_id=skill_id)
+            flash("Task title is required", "error")
+            return render_template("add_task.html", skill_id=skill_id, skill_name=skill[0])
         
-        conn = get_db()
-        task_id, status, error = add_task(skill_id, title, description, points, session["user_id"], conn)
+        if points < 1:
+            points = 1
+        if points > 1000:
+            points = 1000
         
-        if status == "success":
+        with sqlite3.connect("users.db") as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO tasks (skill_id, title, description, points, created_by) VALUES (?, ?, ?, ?, ?)",
+                (skill_id, title, description, points, session["user_id"])
+            )
             conn.commit()
-            flash("Task added successfully!", "success")
-            return redirect(url_for("view_skill", skill_id=skill_id))
-        else:
-            flash(error, "error")
-            return render_template("add_task.html", skill_id=skill_id)
+        
+        flash(f"Task '{title}' added successfully with {points} points!", "success")
+        return redirect(url_for("view_skill", skill_id=skill_id))
     
-    return render_template("add_task.html", skill_id=skill_id)
+    return render_template("add_task.html", skill_id=skill_id, skill_name=skill[0])
 
 @app.route("/complete_task/<int:task_id>")
 def complete_task_route(task_id):
