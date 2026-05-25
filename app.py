@@ -551,10 +551,8 @@ def leaderboard():
 
 @app.route("/logout")
 def logout():
-    session.pop("user_id", None)
-    session.pop("username", None)
+    session.clear()
     flash("You have been logged out", "info")
     return redirect(url_for("login"))
-
 if __name__ == "__main__":
     app.run(debug=True)
