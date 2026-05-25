@@ -119,9 +119,9 @@ def register():
             
             hashed_password = generate_password_hash(password)
             cursor.execute(
-                "INSERT INTO users (username, password) VALUES (?, ?)",
-                (username, hashed_password)
-            )
+    "INSERT INTO users (username, password, total_points) VALUES (?, ?, 0)",
+    (username, hashed_password)
+)
             conn.commit()
             
             user_id = cursor.lastrowid
@@ -157,6 +157,49 @@ def login():
         flash("Invalid credentials", "error")
     
     return render_template("login.html")
+    
+    
+    
+    
+@app.route("/profile")
+def profile():
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+
+    with sqlite3.connect("users.db") as conn:
+        cursor = conn.cursor()
+
+        # user info
+        cursor.execute("""
+            SELECT id, username, total_points, created_at
+            FROM users
+            WHERE id = ?
+        """, (session["user_id"],))
+        user = cursor.fetchone()
+
+        # skills created by user
+        cursor.execute("""
+            SELECT id, name, created_at
+            FROM skills
+            WHERE created_by = ?
+            ORDER BY created_at DESC
+        """, (session["user_id"],))
+        skills = cursor.fetchall()
+
+        # tasks completed by user
+        cursor.execute("""
+            SELECT COUNT(*)
+            FROM task_completions
+            WHERE user_id = ?
+        """, (session["user_id"],))
+        completed_count = cursor.fetchone()[0]
+
+    return render_template(
+        "profile.html",
+        user=user,
+        skills=skills,
+        completed_count=completed_count
+    )
 
 @app.route("/dashboard")
 def dashboard():
@@ -378,10 +421,10 @@ def complete_task(task_id):
         """, (task_id, session["user_id"], points_awarded))
 
         cursor.execute("""
-            UPDATE users
-            SET total_points = total_points + ?
-            WHERE id = ?
-        """, (points_awarded, session["user_id"]))
+    UPDATE users
+    SET total_points = COALESCE(total_points, 0) + ?
+    WHERE id = ?
+""", (points_awarded, session["user_id"]))
 
         cursor.execute("""
             INSERT INTO user_skill_points (user_id, skill_id, points)
