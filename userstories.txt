@@ -1,0 +1,124 @@
+1/ As a user, i want to register an account so that i can access the system and track my progress
+
+Acceptance criteria:
+1. user can enter a unique username and password
+2. password is securely hashed before storage
+3. multiple users cannot have the same username
+4. once succesfully registered, user is logged in automatically and redirected to the dashboard.
+5. user record is created in the database
+
+2/ As a user, i want to log in so that i can access my personal dashboard
+
+Acceptance criteria:
+1. username must enter a valid username and password.
+2. password is verified against hashed password.
+3. invalid cridentials are rejected.
+4. on sucess, session is created with user ID and username.
+
+3/ As a user, i want to log out so that my session is securely ended
+
+Acceptance criteria:
+1. session is completely cleared on logout
+2. user is redirected to login page
+3. protected routes become inaccessible without login
+
+4/ As a user, i want to create a skill so that i can define a learning area to track
+
+Acceptance criteria:
+1. User must be logged in
+2. Skill must have a name
+3. Description is optional
+4. Skill is stored in database with creator ID
+5. Skill appears on dashboard after creation
+
+5/ As a user, I want to view all active skills so that I can explore available learning areas.
+
+Acceptance criteria:
+1. All active skills are displayed on dashboard
+2. Each skill shows name, creator, and number of tasks
+3. Deleted/inactive skills are not shown
+
+6/ As a skill owner, I want to add tasks to my skill so that I can define learning challenges.
+
+Acceptance criteria:
+1. only the skill creator can add tasks to it.
+2. Tasks must have a title, descriptions are optional
+3. points earned from tasks must be between 1 and 100
+4. Task is visible immedietly arent creation.
+
+7/ As a user, I want to view tasks inside a skill so that I understand what needs to be done.
+
+Acceptance criteria:
+1. All active tasks for a skill are shown
+2. Each task displays title, description, and points
+3. Completed tasks are visually marked
+4. Deleted tasks are not shown
+
+8/ As a user, I want to complete tasks so that I can earn points and track progress.
+
+Acceptance Criteria:
+1. User must be logged in
+2. Task must exist and be active
+3. User cannot complete the same task twice
+4. On completion:
+   - User earns task points
+   - Total user points are updated
+   - Skill-specific points are updated
+   - Completion is stored in database
+
+9/ Prevent Duplicate Completion
+
+User Story: As a system, I want to prevent duplicate task completion so that users cannot exploit the points system.
+
+Acceptance Criteria:
+1. System checks if user already completed task
+2. Duplicate completions are blocked
+3. No additional points are awarded for repeat attempts
+
+10/ Skill Leaderboard
+
+User Story: As a user, I want to see a leaderboard so that I can compare my progress with others.
+
+Acceptance Criteria:
+1. Users are ranked by skill-specific points
+2. Leaderboard is displayed per skill
+3. Rankings update automatically after task completion
+
+11/ Global Leaderboard
+
+User Story: As a user, I want to see a global leaderboard so that I can compare overall performance.
+
+Acceptance Criteria:
+1. Users are ranked by total_points
+2. Top users are displayed in descending order
+3. Updates reflect real-time task completions
+
+12/ Delete Skill
+
+User Story: As a skill owner, I want to delete a skill so that I can remove irrelevant content.
+
+Acceptance Criteria:
+1. Only skill creator can delete skill
+2. Skill is soft-deleted (is_active = 0)
+3. All associated tasks are also deactivated
+4. Skill no longer appears in active listings
+
+13/ Delete Task
+
+User Story: As a skill owner, I want to delete a task so that I can manage skill content.
+
+Acceptance Criteria:
+1. Only task creator (skill owner) can delete task
+2. Task is soft-deleted (is_active = 0)
+3. Deleted tasks are hidden from users
+4. Existing completions remain stored
+
+14/ User Profile Page
+
+User Story: As a user, I want to view my profile so that I can track my progress and activity.
+
+Acceptance Criteria:
+1. Profile displays username and join date
+2. Total points are shown
+3. Number of completed tasks is shown
+4. List of created skills is displayed
