@@ -103,9 +103,30 @@ def register():
         username = request.form["username"].strip()
         password = request.form["password"].strip()
         
-        if not username or not password:
-            flash("Username and password required", "error")
+      if not username or not password:
+           flash("Username and password required", "error")
+           return render_template("register.html")
+            
+            
+      if len(password)< 8:
+            flash("Password must be at least 8 characters long.", "error")
             return render_template("register.html")
+            
+        if not re.search(r"[A-Z]", password):
+        	flash("password must contain atleast one uppercase letter" , "error")
+        	return render_template("register.html")
+        	
+        if not re.search(r"[a-z]", password):
+        	flash("password must contain one lowercase letter", "error")
+        	return render_template("register.html")
+        	
+        if not re.search(r"[0-9]", password):
+        	flash("password must contain atleast one number", "error")
+        	return render_template("register.html")
+        	
+        if not re.search(r"[^A-Zz-z0-9]", password)
+        	flash("password must contain atleast one special character", "error")
+        		return render_template("register.html")
         
         with sqlite3.connect("users.db") as conn:
             cursor = conn.cursor()
@@ -132,6 +153,15 @@ def register():
         return redirect(url_for("dashboard"))
     
     return render_template("register.html")
+    
+    
+    
+    
+    
+    
+    
+    
+    
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
