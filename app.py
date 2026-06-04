@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, redirect, session, url_for, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
+import re 
 import sqlite3
 import os
 
@@ -96,37 +97,38 @@ def home():
     if "user_id" in session:
         return redirect(url_for("dashboard"))
     return redirect(url_for("login"))
-
-@app.route("/register", methods=["GET", "POST"])
+@app.route("/register", methods=["GET", "post"])
 def register():
     if request.method == "POST":
         username = request.form["username"].strip()
         password = request.form["password"].strip()
         
-      if not username or not password:
-           flash("Username and password required", "error")
-           return render_template("register.html")
-            
-            
-      if len(password)< 8:
+        if not username or not password:
+            flash("Username and password required", "error")
+            return render_template("register.html")
+        
+        
+        if len(password) < 8:
             flash("Password must be at least 8 characters long.", "error")
             return render_template("register.html")
             
         if not re.search(r"[A-Z]", password):
-        	flash("password must contain atleast one uppercase letter" , "error")
-        	return render_template("register.html")
-        	
+            flash("Password must contain at least one uppercase letter.", "error")
+            return render_template("register.html")
+            
         if not re.search(r"[a-z]", password):
-        	flash("password must contain one lowercase letter", "error")
-        	return render_template("register.html")
-        	
+            flash("Password must contain at least one lowercase letter.", "error")
+            return render_template("register.html")
+            
         if not re.search(r"[0-9]", password):
-        	flash("password must contain atleast one number", "error")
-        	return render_template("register.html")
-        	
-        if not re.search(r"[^A-Zz-z0-9]", password)
-        	flash("password must contain atleast one special character", "error")
-        		return render_template("register.html")
+            flash("Password must contain at least one number.", "error")
+            return render_template("register.html")
+            
+        # Matches any character that is NOT a letter or a digit
+        if not re.search(r"[^A-Za-z0-9]", password):
+            flash("Password must contain at least one special character.", "error")
+            return render_template("register.html")
+        # ---------------------------------
         
         with sqlite3.connect("users.db") as conn:
             cursor = conn.cursor()
@@ -140,9 +142,9 @@ def register():
             
             hashed_password = generate_password_hash(password)
             cursor.execute(
-    "INSERT INTO users (username, password, total_points) VALUES (?, ?, 0)",
-    (username, hashed_password)
-)
+                "INSERT INTO users (username, password, total_points) VALUES (?, ?, 0)",
+                (username, hashed_password)
+            )
             conn.commit()
             
             user_id = cursor.lastrowid
@@ -153,14 +155,6 @@ def register():
         return redirect(url_for("dashboard"))
     
     return render_template("register.html")
-    
-    
-    
-    
-    
-    
-    
-    
     
 
 @app.route("/login", methods=["GET", "POST"])
